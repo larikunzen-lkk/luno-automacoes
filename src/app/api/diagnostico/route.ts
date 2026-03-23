@@ -4,6 +4,26 @@ const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL;
 const MAKE_WEBHOOK_SECRET = process.env.MAKE_WEBHOOK_SECRET;
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY;
 
+// Simple in-memory rate limiter: max 5 requests per IP per 10 minutes
+const rateMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 5;
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateMap.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    rateMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT) return false;
+
+  entry.count++;
+  return true;
+}
+
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
   if (!TURNSTILE_SECRET) return true; // Dev mode sem chave configurada
 
@@ -23,6 +43,18 @@ async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limiting
+    const ip = req.headers.get("cf-connecting-ip") ??
+                req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+                "unknown";
+
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json(
+        { message: "Já recebemos seu contato! Aguarde alguns minutos antes de tentar novamente." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { segment, company, pains, name, contact, turnstileToken, pacote } = body;
 
@@ -45,10 +77,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify Turnstile
-    const ip = req.headers.get("cf-connecting-ip") ??
-                req.headers.get("x-forwarded-for") ??
-                "unknown";
-
     if (turnstileToken) {
       const valid = await verifyTurnstile(turnstileToken, ip);
       if (!valid) {
