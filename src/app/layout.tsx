@@ -29,12 +29,24 @@ export const metadata: Metadata = {
     "Zapier",
   ],
   authors: [{ name: "Luno Automações" }],
+  metadataBase: new URL("https://luno-automacoes.vercel.app"),
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "Luno Automações | Automatize sua clínica e escale sem contratar",
     description:
       "A geração imediatista não espera. Sua operação também não deveria.",
     type: "website",
     locale: "pt_BR",
+    url: "https://luno-automacoes.vercel.app",
+    siteName: "Luno Automações",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Luno Automações | Automatize sua clínica e escale sem contratar",
+    description:
+      "A geração imediatista não espera. Sua operação também não deveria.",
   },
 };
 
